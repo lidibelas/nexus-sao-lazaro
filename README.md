@@ -24,6 +24,14 @@ A aplicação é uma SPA estática em Vite (JavaScript puro) e pode ser publicad
 - entidades de Centro Acadêmico separadas de gestões no modelo de dados;
 - persistência **local** de submissões e papel de demonstração via `localStorage`.
 
+## Estrutura editorial e acervo visual
+
+- `CONTRIBUTING.md` explica a diferença entre **envio para curadoria** e **edição direta pela equipe autorizada**.
+- `src/data.js` concentra conteúdos públicos aprovados e inseridos diretamente no site — incluindo a lista de serviços.
+- `public/imagens/` recebe exclusivamente cópias públicas, aprovadas e otimizadas; não recebe originais, arquivos pendentes ou materiais sensíveis.
+- `docs/catalogo-fotografias.md` mantém a ficha mínima e os estados editoriais das fotos publicadas.
+- O acervo completo/original será preservado em Drive privado quando a conta institucional e a estrutura de acesso forem definidas; isso ainda não está configurado.
+
 ## Limite explícito do protótipo
 
 Não há servidor, autenticação real, envio real de arquivos ou banco remoto neste estágio. Assim, o painel é funcional **no navegador local**, mas não deve ser usado como produção. Ele demonstra as telas, fluxos e modelo editorial; a produção exige backend com controle de acesso.

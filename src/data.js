@@ -20,6 +20,13 @@ export const posts = [
  {id:'conquistas',section:'Conquistas',kind:'Convite',title:'Uma conquista também pode virar notícia',excerpt:'Prêmios, publicações, seleções e realizações coletivas: conte ao Nexus.',demo:true},
 ];
 export const events = [{id:'event-1',title:'Agenda de São Lázaro: envie atividades abertas',date:'A definir',place:'São Lázaro / online',category:'Chamada comunitária',description:'O MVP abre uma fila de moderação para agenda. Este registro é demonstrativo e não anuncia evento real.',demo:true}];
+
+// Conteúdos incluídos diretamente no site pela equipe editorial autorizada.
+// Cada item deve ter sido verificado antes do merge em main; não é uma fila pública.
+export const services = [
+ {id:'servico-chamada',kind:'Envie seu serviço',title:'Divulgue uma iniciativa de renda',description:'Fotografia, revisão, alimentação, arte, cuidados e outros serviços da comunidade podem ser encaminhados para curadoria.',demo:true}
+];
+
 export const organizations = [
  {id:'cacs',name:'Centro Acadêmico de Ciências Sociais',sigla:'CACS',course:'Ciências Sociais',instagram:'Não informado',logo:'CACS',currentManagement:null,description:'Organização iniciadora do Nexus. Dados de gestão são administráveis no painel.'},
  {id:'ca-historia',name:'Centro Acadêmico de História',sigla:'CAH',course:'História',instagram:'Não informado',logo:'CAH',currentManagement:null,description:'Espaço preparado para associação de gestão, logos e links.'}
