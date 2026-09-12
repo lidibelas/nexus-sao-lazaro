@@ -24,4 +24,21 @@ export const organizations = [
  {id:'cacs',name:'Centro Acadêmico de Ciências Sociais',sigla:'CACS',course:'Ciências Sociais',instagram:'Não informado',logo:'CACS',currentManagement:null,description:'Organização iniciadora do Nexus. Dados de gestão são administráveis no painel.'},
  {id:'ca-historia',name:'Centro Acadêmico de História',sigla:'CAH',course:'História',instagram:'Não informado',logo:'CAH',currentManagement:null,description:'Espaço preparado para associação de gestão, logos e links.'}
 ];
-export const roles = ['Administrador geral','Editor','Moderador','Redator / Colaborador','Representante de Centro Acadêmico'];
+// Estrutura editorial inicial: proposta pública, a revisar com a futura equipe.
+// Não há cadastro, login ou permissões reais neste MVP.
+export const editorialTeam = {
+  lead: {name:'Lídia Belas', role:'Editora-chefe interina', scope:'Responsável inicial pela curadoria, moderação e formação da equipe.'},
+  stage:'implantação',
+  note:'Enquanto não houver equipe treinada, somente a editora-chefe deve aprovar, publicar ou acessar a fila de envios reais.'
+};
+
+export const roleDefinitions = [
+  {name:'Editora-chefe', access:'Acesso integral à fila editorial e às configurações.', does:'Define critérios, coordena a equipe, aprova publicações, cuida de casos sensíveis e forma novas pessoas.'},
+  {name:'Editora', access:'Acesso editorial após formação e convite.', does:'Organiza pautas, revisa materiais, pede ajustes e publica dentro dos critérios definidos pela editoria-chefe.'},
+  {name:'Revisor(a)', access:'Acesso apenas aos itens atribuídos para revisão.', does:'Confere clareza, links, fonte, datas, créditos, autorização e adequação antes da decisão editorial.'},
+  {name:'Monitor(a) de comunidade', access:'Acesso a registros e alertas atribuídos, sem publicação.', does:'Acompanha fontes e coletivos, sugere pautas e sinaliza informações que precisam de curadoria.'},
+  {name:'Redator(a) / colaborador(a)', access:'Pode enviar e acompanhar somente os próprios envios.', does:'Produz textos, registros e propostas; não aprova nem visualiza envios de outras pessoas.'},
+  {name:'Representante de organização', access:'Pode enviar em nome de um CA, coletivo, projeto, laboratório ou editora.', does:'Atualiza a ficha pública da organização e encaminha conteúdos para análise; não se autoaprova.'}
+];
+
+export const roles = roleDefinitions.map(role => role.name);
