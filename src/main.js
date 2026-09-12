@@ -1,5 +1,6 @@
 import './style.css';
-import {sources, opportunities, posts, events, services, organizations, roles, editorialTeam, roleDefinitions, checkedAt} from './data.js';
+import {sources, opportunities, posts, events, services, organizations, editorialTeam, roleDefinitions, checkedAt} from './data.js';
+import { currentEditorialAccess, isSupabaseConfigured, sendMagicLink, signOut } from './auth.js';
 
 const store = {
   get(k, fallback){ try { return JSON.parse(localStorage.getItem(k)) ?? fallback } catch { return fallback } },
@@ -7,7 +8,6 @@ const store = {
 };
 let submitted = store.get('nexus-submissions', []);
 let extraOpps = store.get('nexus-opportunities', []);
-let activeRole = store.get('nexus-role', 'Editora-chefe');
 const allOpps = () => [...opportunities, ...extraOpps];
 const $ = (s) => document.querySelector(s);
 const safe = (value='') => String(value).replace(/[&<>'"]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[c]));
@@ -32,15 +32,34 @@ function governance(){
   shell(`<section class="page-head">${intro}<h1>Equipe e regras editoriais</h1><p>O Nexus não é um mural automático: toda publicação passa por critérios, responsabilidade e cuidado com quem enviou.</p></section><section class="split"><div class="feature"><div class="eyebrow">RESPONSÁVEL NA IMPLANTAÇÃO</div><h2>${safe(editorialTeam.lead.name)}</h2><p><b>${safe(editorialTeam.lead.role)}</b></p><p>${safe(editorialTeam.lead.scope)}</p></div><div class="source-box"><b>Regra de início</b><p>${safe(editorialTeam.note)}</p><small>Esta é a estrutura inicial do projeto; novas permissões só devem ser abertas após formação, convite e regras escritas.</small></div></section><section class="section-head"><div>${intro}<h2>Funções da futura equipe</h2><p>As funções abaixo são diferentes entre si: enviar não é revisar; revisar não é publicar.</p></div></section><section class="editorial-grid">${roleCards}</section><section class="prose"><h2>Como um envio deve circular</h2><ol><li>A pessoa ou organização envia uma proposta.</li><li>O material fica privado, em análise.</li><li>A editora-chefe verifica autoria, fonte, datas, créditos e autorização.</li><li>O envio pode ser publicado, devolvido para ajuste, recusado ou arquivado.</li><li>Só o conteúdo aprovado se torna público.</li></ol><h2>Limite técnico atual</h2><p>O formulário e o painel deste MVP ainda usam dados locais do navegador. Eles não recebem nem protegem submissões reais. Antes de abrir envios públicos, o Nexus precisa de login, banco de dados, regras de acesso e política de privacidade.</p></section>`, 'Equipe e regras');
 }
 
-function admin(){
-  const canManage=['Editora-chefe'].includes(activeRole);
-  const queue = !canManage ? '<p>Seu papel pode enviar e acompanhar conteúdo, mas não moderar.</p>' : (!submitted.length ? '<p class="empty">Nenhuma submissão nesta instalação.</p>' : submitted.map(x=>`<article class="queue"><b>${safe(x.title)}</b><span>${safe(x.type)} · ${safe(x.sender)} · ${safe(x.status)}</span><p>${safe(x.description)}</p><button data-id="${x.id}" data-action="approved">Aprovar</button> <button data-id="${x.id}" data-action="changes">Pedir ajuste</button> <button data-id="${x.id}" data-action="rejected">Recusar</button></article>`).join(''));
-  const orgs = organizations.map(o=>`<article class="queue"><b>${o.sigla} — ${o.course}</b><span>${o.name}</span><p>${o.description}</p><button class="edit-org" data-id="${o.id}">Editar no MVP</button></article>`).join('');
-  const content = `<section class="admin-head">${intro}<h1>Painel Nexus</h1><p>Protótipo funcional com persistência local no navegador. O papel selecionado demonstra as permissões; uma implantação pública deve usar autenticação real e banco com políticas de acesso.</p><label>Papel demonstrado<select id="role">${roles.map(r=>`<option ${r===activeRole?'selected':''}>${r}</option>`).join('')}</select></label></section><div class="admin-grid"><section><h2>Fila de moderação <small>${submitted.length}</small></h2>${queue}</section><section><h2>Organizações e gestões</h2>${orgs}<p class="notice">Entidades separadas: Centro Acadêmico (permanente) e Gestão (temporal). A modelagem definitiva está documentada no repositório.</p></section><section><h2>Registros</h2><p><b>${allOpps().length}</b> oportunidades · <b>${sources.length}</b> fontes · <b>${posts.length}</b> conteúdos editoriais</p><a class="button ghost" href="#/fontes">Abrir fontes monitoradas</a></section></div>`;
+function authentication(){
+  const setupNotice = isSupabaseConfigured ? '' : '<p class="notice"><b>Integração pendente.</b> A configuração pública do Supabase ainda não foi adicionada ao deploy. Consulte o guia de implantação do repositório.</p>';
+  shell(`<section class="page-head">${intro}<h1>Área da Editoria</h1><p>O acesso é individual, por link enviado ao e-mail autorizado. Entrar não cria permissão: o Nexus também verifica se a conta possui perfil editorial ativo.</p>${setupNotice}<form id="auth-form" class="submission"><label>E-mail editorial autorizado<input name="email" type="email" autocomplete="email" required></label><button class="button" ${isSupabaseConfigured ? '' : 'disabled'}>Enviar link de acesso</button></form><p class="notice">Não use senhas compartilhadas. A chave pública do aplicativo não concede poderes administrativos; as regras do banco validam cada operação.</p></section>`, 'Área da Editoria');
+  $('#auth-form')?.addEventListener('submit', async event=>{
+    event.preventDefault();
+    const button = $('#auth-form button'); button.disabled = true;
+    const { error } = await sendMagicLink(new FormData(event.currentTarget).get('email'));
+    if (error) alert(`Não foi possível enviar o link: ${error.message}`);
+    else alert('Link enviado. Abra-o neste mesmo navegador para concluir a entrada.');
+    button.disabled = false;
+  });
+}
+
+async function admin(){
+  shell(`<section class="page-head">${intro}<h1>Área da Editoria</h1><p>Validando sessão e permissão editorial…</p></section>`, 'Área da Editoria');
+  const access = await currentEditorialAccess();
+  if (access.status === 'not-configured') return authentication();
+  if (access.status === 'signed-out') return authentication();
+  if (access.status !== 'authorized') {
+    shell(`<section class="page-head">${intro}<h1>Acesso não autorizado</h1><p>Esta conta entrou no Supabase, mas não possui um perfil editorial ativo no Nexus. A liberação depende de cadastro administrativo, papel definido e regras de acesso no banco.</p><button id="logout" class="button ghost">Sair desta conta</button></section>`, 'Acesso não autorizado');
+    $('#logout').addEventListener('click', async ()=>{ await signOut(); location.hash = '#/autenticacao'; });
+    return;
+  }
+  const canManage = access.role === 'Editora-chefe';
+  const queue = canManage ? '<p class="empty">A fila real de moderação será conectada após a criação da tabela de submissões com RLS.</p>' : '<p>Seu papel não permite moderar envios.</p>';
+  const content = `<section class="admin-head">${intro}<h1>Painel Nexus</h1><p>Sessão validada para <b>${safe(access.role)}</b>. O papel vem do perfil editorial protegido no Supabase; ele não pode ser trocado pelo navegador.</p><button id="logout" class="button ghost">Sair desta conta</button></section><div class="admin-grid"><section><h2>Fila de moderação</h2>${queue}</section><section><h2>Organizações e gestões</h2><p class="notice">A edição de entidades será habilitada quando as tabelas operacionais forem publicadas com permissões específicas.</p></section><section><h2>Registros públicos</h2><p><b>${allOpps().length}</b> oportunidades · <b>${sources.length}</b> fontes · <b>${posts.length}</b> conteúdos editoriais</p><a class="button ghost" href="#/fontes">Abrir fontes monitoradas</a></section></div>`;
   shell(content, 'Painel');
-  $('#role').addEventListener('change',e=>{activeRole=e.target.value;store.set('nexus-role',activeRole);admin()});
-  document.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>{submitted=submitted.map(x=>x.id===b.dataset.id?{...x,status:b.dataset.action}:x);store.set('nexus-submissions',submitted);admin()}));
-  document.querySelectorAll('.edit-org').forEach(b=>b.addEventListener('click',()=>alert('No MVP, a entidade já está separada e listada. Na implantação com Supabase, esta ação abrirá um formulário autenticado para editar links, logos e gestão sem mudar código.')));
+  $('#logout').addEventListener('click', async ()=>{ await signOut(); location.hash = '#/autenticacao'; });
 }
 function photographs(){
   const content = `<section class="page-head">${intro}<h1>Fotografias de São Lázaro</h1><p>Uma seleção editorial de acontecimentos, espaços, centros acadêmicos e cotidiano universitário.</p></section>
@@ -48,12 +67,13 @@ function photographs(){
   shell(content,'Fotografias');
 }
 function about(){shell(`<section class="page-head">${intro}<h1>Sobre o Nexus</h1><p>Uma infraestrutura editorial, comunitária e de utilidade pública para São Lázaro.</p></section><section class="prose"><h2>Princípios</h2><p><b>Democratização da informação.</b> Estar fora dos grupos certos não deveria impedir ninguém de descobrir uma oportunidade.</p><p><b>Curadoria, não promessa vazia de automação.</b> O Nexus diferencia fonte institucional, conteúdo enviado e produção editorial; mantém URL e data de verificação.</p><p><b>Memória com cuidado.</b> Fotografias entram por envio, autorização, moderação, crédito e contexto — não por coleta indiscriminada.</p><h2>Direção de arte inicial</h2><p>O sistema visual usa uma linguagem editorial de faixas, tipografia de alto contraste, textura gráfica de cartazes e formas orgânicas que evocam vegetação e circulação. É uma interpretação original: não reproduz logotipos, marcas ou fotos de terceiros.</p><h2>Privacidade e moderação</h2><p>O MVP coleta somente dados necessários ao fluxo demonstrado. Em produção, o formulário precisará de aviso de privacidade, retenção definida, controle de acesso, proteção anti-spam e armazenamento seguro. Serviços não são endossados automaticamente pelo Nexus.</p><h2>Arquitetura de implantação de custo zero</h2><p><b>Frontend:</b> esta aplicação estática em Vite, compatível com GitHub Pages. <b>Backend proposto:</b> Supabase free tier (PostgreSQL, Auth, Storage e políticas RLS), com migração possível via PostgreSQL. <b>Operação:</b> painel autenticado, contas individuais e backup exportável. Nenhum serviço foi contratado ou configurado nesta demonstração.</p></section>`, 'Sobre')}
-function authReturn(){
-  // Supabase returns credentials/errors in the URL fragment. This static MVP has
-  // no Supabase client yet, so it must acknowledge the return without pretending
-  // that an editorial session has been created.
-  history.replaceState(null, '', `${location.pathname}${location.search}#/autenticacao`);
-  shell(`<section class="page-head"><div class="eyebrow">ACESSO EM IMPLANTAÇÃO</div><h1>Retorno de autenticação recebido.</h1><p>O Nexus recebeu o retorno do e-mail de convite, mas a Área da Editoria ainda não foi integrada ao Supabase. Por isso, esta tela não confirma acesso editorial nem mostra um painel protegido.</p><p>Seu link não será exibido nem mantido na barra de endereço. Quando a integração estiver publicada, o acesso será validado por conta individual, lista de pessoas autorizadas e permissões.</p><a class="button" href="#/">Voltar ao início</a></section>`, 'Retorno de autenticação');
+async function authReturn(){
+  shell(`<section class="page-head">${intro}<h1>Concluindo a autenticação…</h1><p>Validando sua sessão e autorização editorial com segurança.</p></section>`, 'Autenticação');
+  const access = await currentEditorialAccess();
+  history.replaceState(null, '', `${location.pathname}${location.search}#/admin`);
+  if (access.status === 'authorized') return admin();
+  if (access.status === 'not-authorized') return admin();
+  return authentication();
 }
 function notFound(){shell(`<section class="page-head"><h1>Página não encontrada</h1><a class="button" href="#/">Voltar ao início</a></section>`,'Não encontrada')}
 function route(){
@@ -61,5 +81,5 @@ function route(){
   const authParams=new URLSearchParams(r);
   const isAuthReturn=authParams.has('access_token')||authParams.has('refresh_token')||authParams.has('error')||authParams.get('type')==='invite';
   if(isAuthReturn) authReturn();
-  else if(r==='/')home();else if(r==='/oportunidades')opportunitiesPage();else if(r.startsWith('/oportunidade/'))opportunity(r.split('/').pop());else if(r==='/agenda')generic('Agenda','Atividades de São Lázaro, com origem e status claramente indicados.',events);else if(r==='/revista')generic('Revista','Reportagens, guias, entrevistas e memória. Itens demonstrativos são identificados como tal.',posts.filter(x=>x.section==='Revista'));else if(r==='/comunidade')generic('Comunidade','Coletivos, projetos, produções e iniciativas de quem faz São Lázaro.',posts.filter(x=>x.section==='Comunidade'));else if(r==='/conquistas')generic('Conquistas','O que a comunidade realiza também merece circular.',posts.filter(x=>x.section==='Conquistas'));else if(r==='/servicos')generic('Serviços / Classificados','Trabalho e renda fazem parte da permanência. Conteúdo passa por moderação e não representa endosso do Nexus.',services);else if(r==='/fotografias')photographs();else if(r==='/fontes')sourcesPage();else if(r==='/enviar')send();else if(r==='/governanca')governance();else if(r==='/enviado'){shell(`<section class="page-head"><div class="eyebrow">RECEBIDO</div><h1>Entrou na fila de moderação.</h1><p>O envio foi salvo localmente nesta demonstração. No produto publicado, a equipe poderá aprovar, pedir ajuste ou recusar, com registro das ações.</p><a class="button" href="#/">Voltar ao início</a></section>`,'Envio recebido')}else if(r==='/admin')admin();else if(r==='/sobre')about();else notFound();window.scrollTo({top:0});}
+  else if(r==='/')home();else if(r==='/oportunidades')opportunitiesPage();else if(r.startsWith('/oportunidade/'))opportunity(r.split('/').pop());else if(r==='/agenda')generic('Agenda','Atividades de São Lázaro, com origem e status claramente indicados.',events);else if(r==='/revista')generic('Revista','Reportagens, guias, entrevistas e memória. Itens demonstrativos são identificados como tal.',posts.filter(x=>x.section==='Revista'));else if(r==='/comunidade')generic('Comunidade','Coletivos, projetos, produções e iniciativas de quem faz São Lázaro.',posts.filter(x=>x.section==='Comunidade'));else if(r==='/conquistas')generic('Conquistas','O que a comunidade realiza também merece circular.',posts.filter(x=>x.section==='Conquistas'));else if(r==='/servicos')generic('Serviços / Classificados','Trabalho e renda fazem parte da permanência. Conteúdo passa por moderação e não representa endosso do Nexus.',services);else if(r==='/fotografias')photographs();else if(r==='/fontes')sourcesPage();else if(r==='/enviar')send();else if(r==='/autenticacao')authentication();else if(r==='/governanca')governance();else if(r==='/enviado'){shell(`<section class="page-head"><div class="eyebrow">RECEBIDO</div><h1>Entrou na fila de moderação.</h1><p>O envio foi salvo localmente nesta demonstração. No produto publicado, a equipe poderá aprovar, pedir ajuste ou recusar, com registro das ações.</p><a class="button" href="#/">Voltar ao início</a></section>`,'Envio recebido')}else if(r==='/admin')admin();else if(r==='/sobre')about();else notFound();window.scrollTo({top:0});}
 window.addEventListener('hashchange',route);route();
